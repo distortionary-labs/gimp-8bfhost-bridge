@@ -109,8 +109,11 @@ def parse_folders(text, separator=os.pathsep):
     for line in str(text).splitlines():
         for part in line.split(separator):
             part = part.strip()
-            if part and part not in folders:
-                folders.append(os.path.expanduser(part))
+            if not part:
+                continue
+            folder = os.path.normpath(os.path.expanduser(part))
+            if folder not in folders:
+                folders.append(folder)
     return folders
 
 

@@ -45,8 +45,11 @@ def test_paths():
 
 
 def test_folder_lists():
-    assert settings_module.parse_folders("/a:/b c\n/d::/a", separator=":") == ["/a", "/b c", "/d"]
-    assert settings_module.parse_folders(r"C:\f;D:\g", separator=";") == [r"C:\f", r"D:\g"]
+    expected = [os.path.normpath(p) for p in ("/a", "/b c", "/d")]
+    assert settings_module.parse_folders("/a:/b c\n/d::/a", separator=":") == expected
+    expected = [os.path.normpath(p) for p in (r"C:\f", r"D:\g")]
+    assert settings_module.parse_folders(r"C:\f;D:\g", separator=";") == expected
+    assert settings_module.parse_folders("/a/:/a", separator=":") == [os.path.normpath("/a")]
     home = os.path.expanduser("~")
     assert settings_module.parse_folders("~/filters", separator=":") == [
         os.path.join(home, "filters")

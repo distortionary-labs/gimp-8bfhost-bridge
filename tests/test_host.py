@@ -124,7 +124,8 @@ def test_successful_run_collects_output(tmp_path):
     pumps = []
     result = host.run(command, pump=lambda: pumps.append(1))
     assert result.ok
-    assert result.stdout == "hello\n"
+    # The fake host is Python, which writes "\r\n" on Windows.
+    assert result.stdout.replace("\r\n", "\n") == "hello\n"
     assert result.log == ["[host] a log line"]
     assert pumps
 
