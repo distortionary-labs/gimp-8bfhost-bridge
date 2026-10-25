@@ -1,0 +1,115 @@
+name: Release
+
+# bin/release pushes a v* tag; this workflow turns it into a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+
+# One release per tag at a time; a rerun waits rather than racing.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Lint, unit tests on every platform and the tests against a real 8bf-host.
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: checks
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag against the version
+        id: version
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' gimp-8bfhost-bridge/gimp_8bfhost_bridge/__init__.py)
+          if [[ "v$version" != "$GITHUB_REF_NAME" ]]; then
+            echo "tag $GITHUB_REF_NAME does not match version $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Write release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            index($0, "## " v " ") == 1 { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          if [[ ! -s notes.md ]]; then
+            echo "CHANGELOG.md has no section for $VERSION" >&2
+            exit 1
+          fi
+      - run: make package
+      # The zip must extract to a single plug-in folder with an executable
+      # entry point and no bytecode, or GIMP will not load it.
+      - name: Check the package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          zip=dist/gimp-8bfhost-bridge-$VERSION.zip
+          unzip -Z1 "$zip" > contents.txt
+          grep -qx 'gimp-8bfhost-bridge/gimp-8bfhost-bridge.py' contents.txt
+          grep -qx 'gimp-8bfhost-bridge/gimp_8bfhost_bridge/plugin.py' contents.txt
+          if grep -E '__pycache__|\.pyc$' contents.txt; then
+            echo "the package contains bytecode" >&2
+            exit 1
+          fi
+          if grep -vE '^(gimp-8bfhost-bridge/|LICENSE$)' contents.txt; then
+            echo "the package has files outside the plug-in folder" >&2
+            exit 1
+          fi
+          unzip -Z "$zip" gimp-8bfhost-bridge/gimp-8bfhost-bridge.py | grep -q '^-rwx'
+      - name: Write checksums
+        run: cd dist && sha256sum ./* > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            dist/
+            notes.md
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.zip
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+          PRERELEASE: ${{ needs.build.outputs.prerelease }}
+        run: |
+          flags=()
+          if [[ "$PRERELEASE" == true ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --verify-tag \
+            --title "gimp-8bfhost-bridge $VERSION" \
+            --notes-file notes.md \
+            "${flags[@]}"

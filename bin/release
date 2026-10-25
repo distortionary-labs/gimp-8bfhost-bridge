@@ -9,9 +9,10 @@
 # "## <version> - <today>"; if a dated section for the version already
 # exists, it is used as is.
 #
-# Pushing the tag is the release: the Release workflow runs the tests, including the ones
-# against a real 8bf-host, builds the plug-in zip and creates the GitHub
-# release with it and the changelog section as notes. Nothing is built here.
+# Pushing the tag is the release: the Release workflow runs the tests,
+# including the ones against a real 8bf-host, builds the plug-in zip and
+# creates the GitHub release with it and the changelog section as notes.
+# Nothing is built here.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
