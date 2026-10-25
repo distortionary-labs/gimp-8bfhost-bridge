@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0 - 2026-10-25
+
 Initial version.
 
 - Runs Photoshop-compatible filter plug-ins (`.8bf`) on GIMP 3 layers through 8bf-host,
