@@ -3,10 +3,11 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
+  # The release workflow runs these checks before it publishes anything.
+  workflow_call:
 
 # The 8bf-host release the integration tests build. They need a dynamically
 # linked build, which the static release binaries are not, so it is built
@@ -82,41 +83,3 @@ jobs:
       - run: python -m pytest -q -rs
         env:
           EIGHTBF_HOST: ${{ github.workspace }}/8bf-host/target/release/8bf-host
-
-  # Runs only for a v* tag, after every check above passes. bin/release
-  # creates and pushes that tag.
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [lint, test, integration]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check the tag against the version
-        run: |
-          version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' gimp-8bfhost-bridge/gimp_8bfhost_bridge/__init__.py)
-          if [[ "v$version" != "$GITHUB_REF_NAME" ]]; then
-            echo "tag $GITHUB_REF_NAME does not match version $version" >&2
-            exit 1
-          fi
-      - name: Write release notes
-        run: |
-          version=${GITHUB_REF_NAME#v}
-          awk -v v="$version" '
-            index($0, "## " v " ") == 1 { on = 1; next }
-            on && /^## / { exit }
-            on { print }
-          ' CHANGELOG.md > notes.md
-          if [[ ! -s notes.md ]]; then
-            echo "CHANGELOG.md has no section for $version" >&2
-            exit 1
-          fi
-      - run: make package
-      - name: Create the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          (cd dist && sha256sum ./* > SHA256SUMS)
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "gimp-8bfhost-bridge ${GITHUB_REF_NAME#v}" --notes-file notes.md

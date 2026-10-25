@@ -33,4 +33,4 @@
 - [ ] `CHANGELOG.md` updated under a dated heading
 - [ ] Version bumped in `pyproject.toml` and `__init__.py` (semver)
 - [ ] `bin/release <version>` ran: it tags `v<version>` and pushes
-- [ ] CI published the GitHub release with the zip and `SHA256SUMS`
+- [ ] The Release workflow published the GitHub release with the zip, `SHA256SUMS` and an attestation

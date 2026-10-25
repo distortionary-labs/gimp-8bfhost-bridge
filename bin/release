@@ -9,7 +9,7 @@
 # "## <version> - <today>"; if a dated section for the version already
 # exists, it is used as is.
 #
-# Pushing the tag is the release: CI runs the tests, including the ones
+# Pushing the tag is the release: the Release workflow runs the tests, including the ones
 # against a real 8bf-host, builds the plug-in zip and creates the GitHub
 # release with it and the changelog section as notes. Nothing is built here.
 set -euo pipefail
@@ -79,5 +79,5 @@ git tag -a "v$version" -m "gimp-8bfhost-bridge $version"
 git push --atomic origin HEAD:main "v$version"
 
 echo
-echo "Pushed v$version. CI builds and publishes the release:"
-echo "  gh run watch \$(gh run list -L 1 --branch v$version --json databaseId -q '.[0].databaseId')"
+echo "Pushed v$version. The Release workflow builds and publishes it:"
+echo "  gh run watch \$(gh run list -L 1 --workflow release.yml --branch v$version --json databaseId -q '.[0].databaseId')"
